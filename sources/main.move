@@ -372,7 +372,7 @@ module microfinance::savings_lending {
         loan_request_id
     }
 
-        public fun repay_loan(user_id: UID, loan_id: UID, amount: u64, ctx: &mut TxContext) {
+           public fun repay_loan(user_id: UID, loan_id: UID, amount: u64, ctx: &mut TxContext) {
         // Ensure the user account exists
         assert!(exists<UserAccount>(user_id), EAccountNotFound);
 
@@ -408,8 +408,8 @@ module microfinance::savings_lending {
         };
         Vector::push_back(&mut loan_request.repayment_history, repayment_record);
 
-        // Optionally, update the loan status if fully repaid
-        if (loan_request.amount == 0) {
+        // Update the loan status if fully repaid
+        if loan_request.amount == 0 {
             loan_request.status = LoanStatus::Repaid;
         }
 
