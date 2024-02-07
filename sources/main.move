@@ -372,11 +372,9 @@ module microfinance::savings_lending {
         loan_request_id
     }
 
-    public fun repay_loan(user_id: UID, loan_id: UID, amount: u64, ctx: &mut TxContext) {
-        // Ensure the user account exists
+       public fun repay_loan(user_id: UID, loan_id: UID, amount: u64, ctx: &mut TxContext) {
+        // Ensure the user account and loan request exist
         assert!(exists<UserAccount>(user_id), EAccountNotFound);
-
-        // Ensure the loan request exists
         assert!(exists<LoanRequest>(loan_id), ELoanNotFound);
 
         // Retrieve the user's account and loan request from storage
@@ -386,30 +384,35 @@ module microfinance::savings_lending {
         // Check that the loan belongs to the user
         assert!(loan_request.borrower_id == user_id, EUnauthorizedLoanAccess);
 
-        // Validate that the repayment amount is not more than the loan balance
+        // Validate the repayment amount
+        assert!(amount > 0, EInvalidRepaymentAmount);
+
+        // Ensure the repayment amount does not exceed the loan balance
         assert!(amount <= loan_request.amount, ERepaymentAmountTooHigh);
 
         // Update the loan balance and user's account
         loan_request.amount -= amount;
         user_account.loan_balance = Balance::subtract(user_account.loan_balance, amount);
 
-        // Update the repayment history
+        // Create a repayment record
         let repayment_record = RepaymentRecord {
-            id: UID::new(), // Create a new UID for each repayment record
+            id: UID::new(),
             loan_request_id: loan_id,
-            payment_date: now(ctx), // Assuming 'now' is a function to get the current timestamp
+            payment_date: now(ctx),
             amount_paid: amount,
             remaining_balance: loan_request.amount,
-            interest_paid: calculate_interest_paid(amount, loan_request.interest_rate), // Function to calculate interest paid
-            principal_paid: calculate_principal_paid(amount, loan_request.interest_rate), // Function to calculate principal paid
-            late_fee_applied: calculate_late_fee(loan_request.due_by, ctx), // Function to calculate any late fee
+            interest_paid: calculate_interest_paid(amount, loan_request.interest_rate),
+            principal_paid: amount - calculate_interest_paid(amount, loan_request.interest_rate),
+            late_fee_applied: calculate_late_fee(loan_request.due_by, ctx),
             payer_id: user_id,
-            repayment_method: "direct".to_string(), // Assuming direct repayment method
+            repayment_method: "direct".to_string(),
         };
+
+        // Add the repayment record to the loan's repayment history
         Vector::push_back(&mut loan_request.repayment_history, repayment_record);
 
         // Update the loan status if fully repaid
-        if loan_request.amount == 0 {
+        if loan_request.amount == 0 && loan_request.status != LoanStatus::Repaid {
             loan_request.status = LoanStatus::Repaid;
         }
 
