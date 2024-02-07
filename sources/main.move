@@ -340,12 +340,12 @@ module microfinance::savings_lending {
         // Save the updated account back to storage
         move_to(user_id, user_account);
     }
-    public fun apply_for_loan(user_id: UID, amount: u64, purpose: String, ctx: &mut TxContext) -> UID {
-        // Validate the loan amount
-        assert!(amount >= MIN_LOAN, ELoanAmountTooLow);
-
+        public fun apply_for_loan(user_id: UID, amount: u64, purpose: String, ctx: &mut TxContext) -> UID {
         // Ensure the user account exists
         assert!(exists<UserAccount>(user_id), EAccountNotFound);
+
+        // Validate the loan amount
+        assert!(amount >= MIN_LOAN, ELoanAmountTooLow);
 
         // Generate a new UID for the loan request
         let loan_request_id = UID::new();
@@ -355,27 +355,26 @@ module microfinance::savings_lending {
             id: loan_request_id,
             borrower_id: user_id,
             amount: amount,
-            requested_on: now(ctx), // Assuming 'now' is a function to get the current timestamp
-            due_by: calculate_due_date(ctx), // Function to calculate due date based on loan terms
+            requested_on: now(ctx),
+            due_by: calculate_due_date(ctx),
             interest_rate: INTEREST_RATE,
             status: LoanStatus::Pending,
             purpose: purpose,
             repayment_history: Vector::empty(),
-            credit_score_at_request: get_credit_score(user_id), // Function to retrieve user's credit score
-            collateral_id: None, // Assuming no collateral is required for this loan type
+            credit_score_at_request: get_credit_score(user_id),
+            collateral_id: None,
         };
 
         // Store the loan request in Sui storage
-        // Note: Add logic to save the loan request struct in the blockchain's storage
+        move_to(loan_request_id, loan_request);
 
         // Return the unique identifier of the new loan request
         loan_request_id
     }
-    public fun repay_loan(user_id: UID, loan_id: UID, amount: u64, ctx: &mut TxContext) {
-        // Ensure the user account exists
-        assert!(exists<UserAccount>(user_id), EAccountNotFound);
 
-        // Ensure the loan request exists
+       public fun repay_loan(user_id: UID, loan_id: UID, amount: u64, ctx: &mut TxContext) {
+        // Ensure the user account and loan request exist
+        assert!(exists<UserAccount>(user_id), EAccountNotFound);
         assert!(exists<LoanRequest>(loan_id), ELoanNotFound);
 
         // Retrieve the user's account and loan request from storage
@@ -385,30 +384,35 @@ module microfinance::savings_lending {
         // Check that the loan belongs to the user
         assert!(loan_request.borrower_id == user_id, EUnauthorizedLoanAccess);
 
-        // Validate that the repayment amount is not more than the loan balance
+        // Validate the repayment amount
+        assert!(amount > 0, EInvalidRepaymentAmount);
+
+        // Ensure the repayment amount does not exceed the loan balance
         assert!(amount <= loan_request.amount, ERepaymentAmountTooHigh);
 
         // Update the loan balance and user's account
         loan_request.amount -= amount;
         user_account.loan_balance = Balance::subtract(user_account.loan_balance, amount);
 
-        // Update the repayment history
+        // Create a repayment record
         let repayment_record = RepaymentRecord {
-            id: UID::new(), // Create a new UID for each repayment record
+            id: UID::new(),
             loan_request_id: loan_id,
-            payment_date: now(ctx), // Assuming 'now' is a function to get the current timestamp
+            payment_date: now(ctx),
             amount_paid: amount,
             remaining_balance: loan_request.amount,
-            interest_paid: calculate_interest_paid(amount, loan_request.interest_rate), // Function to calculate interest paid
-            principal_paid: calculate_principal_paid(amount, loan_request.interest_rate), // Function to calculate principal paid
-            late_fee_applied: calculate_late_fee(loan_request.due_by, ctx), // Function to calculate any late fee
+            interest_paid: calculate_interest_paid(amount, loan_request.interest_rate),
+            principal_paid: amount - calculate_interest_paid(amount, loan_request.interest_rate),
+            late_fee_applied: calculate_late_fee(loan_request.due_by, ctx),
             payer_id: user_id,
-            repayment_method: "direct".to_string(), // Assuming direct repayment method
+            repayment_method: "direct".to_string(),
         };
+
+        // Add the repayment record to the loan's repayment history
         Vector::push_back(&mut loan_request.repayment_history, repayment_record);
 
-        // Optionally, update the loan status if fully repaid
-        if (loan_request.amount == 0) {
+        // Update the loan status if fully repaid
+        if loan_request.amount == 0 && loan_request.status != LoanStatus::Repaid {
             loan_request.status = LoanStatus::Repaid;
         }
 
@@ -416,6 +420,7 @@ module microfinance::savings_lending {
         move_to(user_id, user_account);
         move_to(loan_id, loan_request);
     }
+
     public fun calculate_and_apply_interest(ctx: &mut TxContext) {
         // Iterate over all UserAccounts in the storage
         let user_accounts = global<UserAccounts>(ctx); // Assuming a collection of all user accounts
