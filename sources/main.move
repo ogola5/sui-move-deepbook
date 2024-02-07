@@ -340,12 +340,12 @@ module microfinance::savings_lending {
         // Save the updated account back to storage
         move_to(user_id, user_account);
     }
-    public fun apply_for_loan(user_id: UID, amount: u64, purpose: String, ctx: &mut TxContext) -> UID {
-        // Validate the loan amount
-        assert!(amount >= MIN_LOAN, ELoanAmountTooLow);
-
+        public fun apply_for_loan(user_id: UID, amount: u64, purpose: String, ctx: &mut TxContext) -> UID {
         // Ensure the user account exists
         assert!(exists<UserAccount>(user_id), EAccountNotFound);
+
+        // Validate the loan amount
+        assert!(amount >= MIN_LOAN, ELoanAmountTooLow);
 
         // Generate a new UID for the loan request
         let loan_request_id = UID::new();
@@ -355,18 +355,18 @@ module microfinance::savings_lending {
             id: loan_request_id,
             borrower_id: user_id,
             amount: amount,
-            requested_on: now(ctx), // Assuming 'now' is a function to get the current timestamp
-            due_by: calculate_due_date(ctx), // Function to calculate due date based on loan terms
+            requested_on: now(ctx),
+            due_by: calculate_due_date(ctx),
             interest_rate: INTEREST_RATE,
             status: LoanStatus::Pending,
             purpose: purpose,
             repayment_history: Vector::empty(),
-            credit_score_at_request: get_credit_score(user_id), // Function to retrieve user's credit score
-            collateral_id: None, // Assuming no collateral is required for this loan type
+            credit_score_at_request: get_credit_score(user_id),
+            collateral_id: None,
         };
 
         // Store the loan request in Sui storage
-        // Note: Add logic to save the loan request struct in the blockchain's storage
+        move_to(loan_request_id, loan_request);
 
         // Return the unique identifier of the new loan request
         loan_request_id
