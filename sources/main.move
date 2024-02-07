@@ -371,7 +371,8 @@ module microfinance::savings_lending {
         // Return the unique identifier of the new loan request
         loan_request_id
     }
-    public fun repay_loan(user_id: UID, loan_id: UID, amount: u64, ctx: &mut TxContext) {
+
+        public fun repay_loan(user_id: UID, loan_id: UID, amount: u64, ctx: &mut TxContext) {
         // Ensure the user account exists
         assert!(exists<UserAccount>(user_id), EAccountNotFound);
 
@@ -416,6 +417,7 @@ module microfinance::savings_lending {
         move_to(user_id, user_account);
         move_to(loan_id, loan_request);
     }
+
     public fun calculate_and_apply_interest(ctx: &mut TxContext) {
         // Iterate over all UserAccounts in the storage
         let user_accounts = global<UserAccounts>(ctx); // Assuming a collection of all user accounts
